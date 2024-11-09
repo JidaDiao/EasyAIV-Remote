@@ -240,9 +240,7 @@ class ModelClientProcess(Process):
                     mouth_eye_vector_c[i] = model_input[i + 12]
                 for i in range(6):
                     pose_vector[0, i] = model_input[i + 27 + 12]
-                # if model is None:
-                #     output_image = input_image
-                # else:
+
                 output_image = model(input_image, mouth_eye_vector, pose_vector, eyebrow_vector, mouth_eye_vector_c,
                                      eyebrow_vector_c,
                                      self.gpu_cache_hit_ratio)
@@ -307,6 +305,13 @@ class EasyAIV(Process):  #
         self.alive_args_is_music_play = alive_args['is_music_play']
         self.alive_args_beat_q = alive_args['beat_q']
         self.alive_args_mouth_q = alive_args['mouth_q']
+        ################# 远程修改
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind(("127.0.0.1", 5002))
+        self.server_socket.listen(1)
+
+        self.conn, self.address = self.server_socket.accept()
+        #################
 
     @torch.no_grad()
     def run(self):
@@ -457,10 +462,12 @@ class EasyAIV(Process):  #
 
             if args.output_webcam:
                 result_image = postprocessed_image
-                if args.output_webcam == 'obs':
-                    result_image = cv2.cvtColor(result_image, cv2.COLOR_RGBA2RGB)
-                cam.send(result_image)
-                cam.sleep_until_next_frame()
+                data = result_image.tobytes()  # 转换为字节流
+
+                # 先发送数据长度
+                self.conn.sendall(len(data).to_bytes(4, 'big'))
+                # 发送图像数据
+                self.conn.sendall(data)
 
 
 class FlaskAPI(Resource):
