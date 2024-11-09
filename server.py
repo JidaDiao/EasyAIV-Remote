@@ -308,8 +308,6 @@ class EasyAIV(Process):  #
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind(("0.0.0.0", 11453))
         self.server_socket.listen(1)
-
-        self.conn, self.address = self.server_socket.accept()
         #################
 
     @torch.no_grad()
@@ -359,114 +357,120 @@ class EasyAIV(Process):  #
         idle_start_time = time.perf_counter()
 
         print("Ready. Close this console to exit.")
-
         while True:
-            # time.sleep(fps_delay)
-
-            idle_flag = False
-            if bool(self.alive_args_is_speech.value):  # 正在说话
-                if not self.alive_args_speech_q.empty():
-                    speech_q = self.alive_args_speech_q.get_nowait()
-                eyebrow_vector_c, mouth_eye_vector_c, pose_vector_c = action.speaking(speech_q)
-            elif bool(self.alive_args_is_singing.value):  # 正在唱歌
-                if not self.alive_args_beat_q.empty():
-                    beat_q = self.alive_args_beat_q.get_nowait()
-                if not self.alive_args_mouth_q.empty():
-                    mouth_q = self.alive_args_mouth_q.get_nowait()
-                eyebrow_vector_c, mouth_eye_vector_c, pose_vector_c = action.singing(beat_q, mouth_q)
-            elif bool(self.alive_args_is_music_play.value):  # 摇子
-                if not self.alive_args_beat_q.empty():
-                    beat_q = self.alive_args_beat_q.get_nowait()
-                eyebrow_vector_c, mouth_eye_vector_c, pose_vector_c = action.rhythm(beat_q)
-            else:  # 空闲状态
-                speech_q = None
-                mouth_q = None
-                beat_q = None
-                idle_flag = True
-                if args.sleep != -1 and time.perf_counter() - idle_start_time > args.sleep:  # 空闲20秒就睡大觉
-                    eyebrow_vector_c, mouth_eye_vector_c, pose_vector_c = action.sleeping()
-                else:
-                    eyebrow_vector_c, mouth_eye_vector_c, pose_vector_c = action.idle()
-
-            if not idle_flag:
-                idle_start_time = time.perf_counter()
-
-            pose_vector_c[3] = pose_vector_c[1]
-            pose_vector_c[4] = pose_vector_c[2]
-
-            model_input_arr = eyebrow_vector_c
-            model_input_arr.extend(mouth_eye_vector_c)
-            model_input_arr.extend(pose_vector_c)
-
-            self.model_process_input_queue.put_nowait(model_input_arr)
-
-            has_model_output = 0
+            conn, address = self.server_socket.accept()
+            print("来自" + str(address) + "的连接")
             try:
-                new_model_output = model_output
-                while not self.model_process_output_queue.empty():
-                    has_model_output += 1
-                    new_model_output = self.model_process_output_queue.get_nowait()
-                model_output = new_model_output
-            except queue.Empty:
-                pass
-            if model_output is None:
-                time.sleep(1)
-                continue
+                while True:
+                    # time.sleep(fps_delay)
 
-            # model_output = self.model_process_output_queue.get()
+                    idle_flag = False
+                    if bool(self.alive_args_is_speech.value):  # 正在说话
+                        if not self.alive_args_speech_q.empty():
+                            speech_q = self.alive_args_speech_q.get_nowait()
+                        eyebrow_vector_c, mouth_eye_vector_c, pose_vector_c = action.speaking(speech_q)
+                    elif bool(self.alive_args_is_singing.value):  # 正在唱歌
+                        if not self.alive_args_beat_q.empty():
+                            beat_q = self.alive_args_beat_q.get_nowait()
+                        if not self.alive_args_mouth_q.empty():
+                            mouth_q = self.alive_args_mouth_q.get_nowait()
+                        eyebrow_vector_c, mouth_eye_vector_c, pose_vector_c = action.singing(beat_q, mouth_q)
+                    elif bool(self.alive_args_is_music_play.value):  # 摇子
+                        if not self.alive_args_beat_q.empty():
+                            beat_q = self.alive_args_beat_q.get_nowait()
+                        eyebrow_vector_c, mouth_eye_vector_c, pose_vector_c = action.rhythm(beat_q)
+                    else:  # 空闲状态
+                        speech_q = None
+                        mouth_q = None
+                        beat_q = None
+                        idle_flag = True
+                        if args.sleep != -1 and time.perf_counter() - idle_start_time > args.sleep:  # 空闲20秒就睡大觉
+                            eyebrow_vector_c, mouth_eye_vector_c, pose_vector_c = action.sleeping()
+                        else:
+                            eyebrow_vector_c, mouth_eye_vector_c, pose_vector_c = action.idle()
 
-            postprocessed_image = model_output
+                    if not idle_flag:
+                        idle_start_time = time.perf_counter()
 
-            # if self.extra_image is not None:
-            #     postprocessed_image = cv2.vconcat([postprocessed_image, self.extra_image])
+                    pose_vector_c[3] = pose_vector_c[1]
+                    pose_vector_c[4] = pose_vector_c[2]
 
-            k_scale = 1
-            rotate_angle = 0
-            dx = 0
-            dy = 0
-            if args.extend_movement:
-                k_scale = position_vector[2] * math.sqrt(args.extend_movement) + 1
-                rotate_angle = -position_vector[0] * 10 * args.extend_movement
-                dx = position_vector[0] * 400 * k_scale * args.extend_movement
-                dy = -position_vector[1] * 600 * k_scale * args.extend_movement
-            if args.bongo:
-                rotate_angle -= 5
-            rm = cv2.getRotationMatrix2D((IMG_WIDTH / 2, IMG_WIDTH / 2), rotate_angle, k_scale)
-            rm[0, 2] += dx + args.output_w / 2 - IMG_WIDTH / 2
-            rm[1, 2] += dy + args.output_h / 2 - IMG_WIDTH / 2
+                    model_input_arr = eyebrow_vector_c
+                    model_input_arr.extend(mouth_eye_vector_c)
+                    model_input_arr.extend(pose_vector_c)
 
-            postprocessed_image = cv2.warpAffine(
-                postprocessed_image,
-                rm,
-                (args.output_w, args.output_h))
+                    self.model_process_input_queue.put_nowait(model_input_arr)
 
-            # if args.anime4k:
-            #     alpha_channel = postprocessed_image[:, :, 3]
-            #     alpha_channel = cv2.resize(alpha_channel, None, fx=2, fy=2)
-            #
-            #     # a.load_image_from_numpy(cv2.cvtColor(postprocessed_image, cv2.COLOR_RGBA2RGB), input_type=ac.AC_INPUT_RGB)
-            #     # img = cv2.imread("character/test41.png")
-            #     img1 = cv2.cvtColor(postprocessed_image, cv2.COLOR_RGBA2BGR)
-            #     # a.load_image_from_numpy(img, input_type=ac.AC_INPUT_BGR)
-            #     a.load_image_from_numpy(img1, input_type=ac.AC_INPUT_BGR)
-            #     a.process()
-            #     postprocessed_image = a.save_image_to_numpy()
-            #     postprocessed_image = cv2.merge((postprocessed_image, alpha_channel))
-            #     postprocessed_image = cv2.cvtColor(postprocessed_image, cv2.COLOR_BGRA2RGBA)
-            if args.alpha_split:
-                alpha_image = cv2.merge(
-                    [postprocessed_image[:, :, 3], postprocessed_image[:, :, 3], postprocessed_image[:, :, 3]])
-                alpha_image = cv2.cvtColor(alpha_image, cv2.COLOR_RGB2RGBA)
-                postprocessed_image = cv2.hconcat([postprocessed_image, alpha_image])
+                    has_model_output = 0
+                    try:
+                        new_model_output = model_output
+                        while not self.model_process_output_queue.empty():
+                            has_model_output += 1
+                            new_model_output = self.model_process_output_queue.get_nowait()
+                        model_output = new_model_output
+                    except queue.Empty:
+                        pass
+                    if model_output is None:
+                        time.sleep(1)
+                        continue
 
-            if args.output_webcam:
-                result_image = postprocessed_image
-                data = result_image.tobytes()  # 转换为字节流
+                    # model_output = self.model_process_output_queue.get()
 
-                # 先发送数据长度
-                self.conn.sendall(len(data).to_bytes(4, 'big'))
-                # 发送图像数据
-                self.conn.sendall(data)
+                    postprocessed_image = model_output
+
+                    # if self.extra_image is not None:
+                    #     postprocessed_image = cv2.vconcat([postprocessed_image, self.extra_image])
+
+                    k_scale = 1
+                    rotate_angle = 0
+                    dx = 0
+                    dy = 0
+                    if args.extend_movement:
+                        k_scale = position_vector[2] * math.sqrt(args.extend_movement) + 1
+                        rotate_angle = -position_vector[0] * 10 * args.extend_movement
+                        dx = position_vector[0] * 400 * k_scale * args.extend_movement
+                        dy = -position_vector[1] * 600 * k_scale * args.extend_movement
+                    if args.bongo:
+                        rotate_angle -= 5
+                    rm = cv2.getRotationMatrix2D((IMG_WIDTH / 2, IMG_WIDTH / 2), rotate_angle, k_scale)
+                    rm[0, 2] += dx + args.output_w / 2 - IMG_WIDTH / 2
+                    rm[1, 2] += dy + args.output_h / 2 - IMG_WIDTH / 2
+
+                    postprocessed_image = cv2.warpAffine(
+                        postprocessed_image,
+                        rm,
+                        (args.output_w, args.output_h))
+
+                    # if args.anime4k:
+                    #     alpha_channel = postprocessed_image[:, :, 3]
+                    #     alpha_channel = cv2.resize(alpha_channel, None, fx=2, fy=2)
+                    #
+                    #     # a.load_image_from_numpy(cv2.cvtColor(postprocessed_image, cv2.COLOR_RGBA2RGB), input_type=ac.AC_INPUT_RGB)
+                    #     # img = cv2.imread("character/test41.png")
+                    #     img1 = cv2.cvtColor(postprocessed_image, cv2.COLOR_RGBA2BGR)
+                    #     # a.load_image_from_numpy(img, input_type=ac.AC_INPUT_BGR)
+                    #     a.load_image_from_numpy(img1, input_type=ac.AC_INPUT_BGR)
+                    #     a.process()
+                    #     postprocessed_image = a.save_image_to_numpy()
+                    #     postprocessed_image = cv2.merge((postprocessed_image, alpha_channel))
+                    #     postprocessed_image = cv2.cvtColor(postprocessed_image, cv2.COLOR_BGRA2RGBA)
+                    if args.alpha_split:
+                        alpha_image = cv2.merge(
+                            [postprocessed_image[:, :, 3], postprocessed_image[:, :, 3], postprocessed_image[:, :, 3]])
+                        alpha_image = cv2.cvtColor(alpha_image, cv2.COLOR_RGB2RGBA)
+                        postprocessed_image = cv2.hconcat([postprocessed_image, alpha_image])
+
+                    if args.output_webcam:
+                        result_image = postprocessed_image
+                        print(np.shape(result_image))
+                        data = result_image.tobytes()  # 转换为字节流
+
+                        # 先发送数据长度
+                        conn.sendall(len(data).to_bytes(4, 'big'))
+                        # 发送图像数据
+                        conn.sendall(data)
+            except (ConnectionResetError, BrokenPipeError) as e:
+                print("客户端连接中断了，等待连接ing")
 
 
 class FlaskAPI(Resource):

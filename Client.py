@@ -55,7 +55,7 @@ class EasyAIV(Process):  #
                 break
 
             # 转换数据为NumPy数组
-            result_image = np.frombuffer(data, dtype=np.uint8).reshape((1024, 1024, 4))
+            result_image = np.frombuffer(data, dtype=np.uint8).reshape((512, 512, 4))
             cam.send(result_image)
             cam.sleep_until_next_frame()
 
