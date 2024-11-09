@@ -307,7 +307,7 @@ class EasyAIV(Process):  #
         self.alive_args_mouth_q = alive_args['mouth_q']
         ################# 远程修改
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind(("127.0.0.1", 5002))
+        self.server_socket.bind(("0.0.0.0", 11453))
         self.server_socket.listen(1)
 
         self.conn, self.address = self.server_socket.accept()

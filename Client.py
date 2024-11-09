@@ -16,7 +16,7 @@ class EasyAIV(Process):  #
     def __init__(self, ):
         super().__init__()
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client_socket.connect(("127.0.0.1", 5002))  # 替换为服务器地址
+        self.client_socket.connect(("192.168.50.13", 11453))  # 替换为服务器地址
 
     @torch.no_grad()
     def run(self):
