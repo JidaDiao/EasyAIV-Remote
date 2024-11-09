@@ -24,7 +24,7 @@ parser.add_argument('--output_size', type=str, default='512x512')
 parser.add_argument('--model', type=str, default='standard_half')
 parser.add_argument('--debug_input', action='store_true')
 parser.add_argument('--perf', type=str)
-parser.add_argument('--anime4k', action='store_true', default=True)
+parser.add_argument('--anime4k', action='store_true', default=False)
 parser.add_argument('--alpha_split', action='store_true')
 parser.add_argument('--bongo', action='store_true')
 parser.add_argument('--cache', type=str, default='256mb')  # 256mb
