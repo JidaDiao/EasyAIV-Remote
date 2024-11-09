@@ -3,7 +3,7 @@ import pyvirtualcam
 import numpy as np
 from multiprocessing import Value, Process, Queue
 from args import args
-
+import cv2
 import socket
 import warnings
 
@@ -17,6 +17,7 @@ class EasyAIV(Process):  #
         super().__init__()
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client_socket.connect(("192.168.50.13", 11453))  # 替换为服务器地址
+        # self.client_socket.connect(("127.0.0.1", 11453))  # 替换为服务器地址
 
     @torch.no_grad()
     def run(self):
@@ -55,7 +56,9 @@ class EasyAIV(Process):  #
                 break
 
             # 转换数据为NumPy数组
-            result_image = np.frombuffer(data, dtype=np.uint8).reshape((512, 512, 4))
+            img_np = np.frombuffer(data, dtype=np.uint8)
+            result_image = cv2.imdecode(img_np, cv2.IMREAD_UNCHANGED)
+            # result_image = np.frombuffer(data, dtype=np.uint8).reshape((512, 512, 4))
             cam.send(result_image)
             cam.sleep_until_next_frame()
 

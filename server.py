@@ -10,6 +10,7 @@ from utils import preprocessing_image
 from action_animeV2 import ActionAnimeV2
 from alive import Alive
 from multiprocessing import Value, Process, Queue
+import multiprocessing
 from ctypes import c_bool
 import os
 import queue
@@ -24,7 +25,6 @@ import socket
 import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning)
-
 fps_delay = 0.01
 
 from flask import Flask
@@ -261,6 +261,8 @@ class ModelClientProcess(Process):
             if args.debug:
                 self.model_fps_number.value = model_fps()
                 self.cache_hit_ratio.value = hit / tot
+            # print('model_fps:' + str(self.model_fps_number.value))
+            # print('gpu_fps:' + str(self.gpu_fps_number.value))
 
 
 def prepare_input_img(IMG_WIDTH, charc):
@@ -462,8 +464,8 @@ class EasyAIV(Process):  #
 
                     if args.output_webcam:
                         result_image = postprocessed_image
-                        print(np.shape(result_image))
-                        data = result_image.tobytes()  # 转换为字节流
+                        _, buffer = cv2.imencode('.webp', result_image, [cv2.IMWRITE_WEBP_QUALITY, 95])
+                        data = buffer.tobytes()  # 转换为字节流
 
                         # 先发送数据长度
                         conn.sendall(len(data).to_bytes(4, 'big'))
@@ -530,6 +532,7 @@ if __name__ == '__main__':
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
     input_image, extra_image = prepare_input_img(512, args.character)
+    multiprocessing.set_start_method('spawn')
 
     # 声明跨进程公共参数
     model_process_args = {
@@ -541,6 +544,7 @@ if __name__ == '__main__':
     model_process = ModelClientProcess(input_image, device, model_process_args)
     model_process.daemon = True
     model_process.start()
+    # model_process.run()
 
     # 声明跨进程公共参数
     alive_args = {
