@@ -1,0 +1,1 @@
+C:\Users\JidaDiao\.conda\envs\AI-Vtuber\python.exe Client.py

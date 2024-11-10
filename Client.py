@@ -10,14 +10,14 @@ import time
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
-
 fps_delay = 0.01
 
 
 class EasyAIV(Process):  #
     def __init__(self, ):
         super().__init__()
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket = None  # 初始化为None
+        # self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     @torch.no_grad()
     def run(self):
@@ -39,9 +39,8 @@ class EasyAIV(Process):  #
             print(f'Using virtual camera: {cam.device}')
         while True:
             try:
-                print(f"尝试连接 “192.168.50.13:11453”ing")
-                self.client_socket.connect(("192.168.50.13", 11453))  # 替换为服务器地址
-                print("连接上了！")
+                self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # 创建新的socket
+                self.client_socket.connect(("192.168.50.13", 11453))
                 try:
                     while True:
                         # 接收数据长度（前4个字节）
