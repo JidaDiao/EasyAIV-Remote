@@ -465,6 +465,7 @@ class EasyAIV(Process):  #
                     if args.output_webcam:
                         result_image = postprocessed_image
                         _, buffer = cv2.imencode('.webp', result_image, [cv2.IMWRITE_WEBP_QUALITY, 95])
+                        # buffer = result_image
                         data = buffer.tobytes()  # 转换为字节流
 
                         # 先发送数据长度
@@ -564,5 +565,5 @@ if __name__ == '__main__':
     aiv.start()
 
     api.add_resource(FlaskAPI, '/alive')
-    app.run(port=args.port)  # 运行 Flask app
+    app.run(host='0.0.0.0', port=args.port)  # 运行 Flask app
     print('process done')
