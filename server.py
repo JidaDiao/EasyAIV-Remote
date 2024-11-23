@@ -464,8 +464,8 @@ class EasyAIV(Process):  #
 
                     if args.output_webcam:
                         result_image = postprocessed_image
-                        _, buffer = cv2.imencode('.webp', result_image, [cv2.IMWRITE_WEBP_QUALITY, 95])
-                        # buffer = result_image
+                        # _, buffer = cv2.imencode('.webp', result_image, [cv2.IMWRITE_WEBP_QUALITY, 95])
+                        _, buffer = cv2.imencode('.png', result_image)
                         data = buffer.tobytes()  # 转换为字节流
 
                         # 先发送数据长度
