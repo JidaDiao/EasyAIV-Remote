@@ -1,6 +1,6 @@
 import torch
 import cv2
-# import pyvirtualcam
+import zlib
 import numpy as np
 from PIL import Image
 
@@ -466,12 +466,12 @@ class EasyAIV(Process):  #
                         result_image = postprocessed_image
                         # _, buffer = cv2.imencode('.webp', result_image, [cv2.IMWRITE_WEBP_QUALITY, 95])
                         _, buffer = cv2.imencode('.png', result_image)
-                        data = buffer.tobytes()  # 转换为字节流
+                        compressed_data = zlib.compress(buffer.tobytes(), level=9)  # 压缩数据
 
-                        # 先发送数据长度
-                        conn.sendall(len(data).to_bytes(4, 'big'))
-                        # 发送图像数据
-                        conn.sendall(data)
+                        # 发送压缩数据长度
+                        conn.sendall(len(compressed_data).to_bytes(4, 'big'))
+                        # 发送压缩数据
+                        conn.sendall(compressed_data)
             except (ConnectionResetError, BrokenPipeError) as e:
                 print("客户端连接中断了，等待连接ing")
 

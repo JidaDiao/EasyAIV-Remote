@@ -1,3 +1,5 @@
+import zlib
+
 import torch
 import pyvirtualcam
 import numpy as np
@@ -61,6 +63,7 @@ class EasyAIV(Process):  #
                             break
 
                         # 转换数据为NumPy数组
+                        decompressed_data = zlib.decompress(data)  # 解压数据
                         img_np = np.frombuffer(data, dtype=np.uint8)
                         result_image = cv2.imdecode(img_np, cv2.IMREAD_UNCHANGED)
                         # result_image = np.frombuffer(data, dtype=np.uint8).reshape((512, 512, 4))
