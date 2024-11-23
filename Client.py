@@ -35,6 +35,16 @@ class EasyAIV(Process):  #
                                        'obs': pyvirtualcam.PixelFormat.RGB}[
                                           args.output_webcam])
             print(f'Using virtual camera: {cam.device}')
+        parameters = ac.Parameters()
+        # enable HDN for ACNet
+        parameters.HDN = True
+
+        a = ac.AC(
+            managerList=ac.ManagerList([ac.OpenCLACNetManager(pID=0, dID=0)]),
+            type=ac.ProcessorType.OpenCL_ACNet,
+        )
+        a.set_arguments(parameters)
+        print("Anime4K Loaded")
         while True:
             try:
                 self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # 创建新的socket
@@ -64,16 +74,7 @@ class EasyAIV(Process):  #
                         img_np = np.frombuffer(data, dtype=np.uint8)
                         result_image = cv2.imdecode(img_np, cv2.IMREAD_UNCHANGED)
                         ################################
-                        parameters = ac.Parameters()
-                        # enable HDN for ACNet
-                        parameters.HDN = True
 
-                        a = ac.AC(
-                            managerList=ac.ManagerList([ac.OpenCLACNetManager(pID=0, dID=0)]),
-                            type=ac.ProcessorType.OpenCL_ACNet,
-                        )
-                        a.set_arguments(parameters)
-                        print("Anime4K Loaded")
                         alpha_channel = result_image[:, :, 3]
                         alpha_channel = cv2.resize(alpha_channel, None, fx=2, fy=2)
 
