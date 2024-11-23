@@ -315,49 +315,13 @@ class EasyAIV(Process):  #
     @torch.no_grad()
     def run(self):
         IMG_WIDTH = 512
-
-        cam = None
-        if args.output_webcam:
-            cam_scale = 1
-            cam_width_scale = 1
-            if args.anime4k:
-                cam_scale = 2
-            if args.alpha_split:
-                cam_width_scale = 2
-            # cam = pyvirtualcam.Camera(width=args.output_w * cam_scale * cam_width_scale,
-            #                           height=args.output_h * cam_scale,
-            #                           fps=30,
-            #                           backend=args.output_webcam,
-            #                           fmt=
-            #                           {'unitycapture': pyvirtualcam.PixelFormat.RGBA,
-            #                            'obs': pyvirtualcam.PixelFormat.RGB}[
-            #                               args.output_webcam])
-            # print(f'Using virtual camera: {cam.device}')
-
-        a = None
-        # if args.anime4k:
-        #     parameters = ac.Parameters()
-        #     # enable HDN for ACNet
-        #     parameters.HDN = True
-        #
-        #     a = ac.AC(
-        #         managerList=ac.ManagerList([ac.OpenCLACNetManager(pID=0, dID=0)]),
-        #         type=ac.ProcessorType.OpenCL_ACNet,
-        #     )
-        #     a.set_arguments(parameters)
-        #     print("Anime4K Loaded")
-
         position_vector = [0, 0, 0, 1]
-
         model_output = None
-
         speech_q = None
         mouth_q = None
         beat_q = None
-
         action = ActionAnimeV2()
         idle_start_time = time.perf_counter()
-
         print("Ready. Close this console to exit.")
         while True:
             conn, address = self.server_socket.accept()
@@ -415,14 +379,7 @@ class EasyAIV(Process):  #
                     if model_output is None:
                         time.sleep(1)
                         continue
-
-                    # model_output = self.model_process_output_queue.get()
-
                     postprocessed_image = model_output
-
-                    # if self.extra_image is not None:
-                    #     postprocessed_image = cv2.vconcat([postprocessed_image, self.extra_image])
-
                     k_scale = 1
                     rotate_angle = 0
                     dx = 0
@@ -443,30 +400,12 @@ class EasyAIV(Process):  #
                         rm,
                         (args.output_w, args.output_h))
 
-                    # if args.anime4k:
-                    #     alpha_channel = postprocessed_image[:, :, 3]
-                    #     alpha_channel = cv2.resize(alpha_channel, None, fx=2, fy=2)
-                    #
-                    #     # a.load_image_from_numpy(cv2.cvtColor(postprocessed_image, cv2.COLOR_RGBA2RGB), input_type=ac.AC_INPUT_RGB)
-                    #     # img = cv2.imread("character/test41.png")
-                    #     img1 = cv2.cvtColor(postprocessed_image, cv2.COLOR_RGBA2BGR)
-                    #     # a.load_image_from_numpy(img, input_type=ac.AC_INPUT_BGR)
-                    #     a.load_image_from_numpy(img1, input_type=ac.AC_INPUT_BGR)
-                    #     a.process()
-                    #     postprocessed_image = a.save_image_to_numpy()
-                    #     postprocessed_image = cv2.merge((postprocessed_image, alpha_channel))
-                    #     postprocessed_image = cv2.cvtColor(postprocessed_image, cv2.COLOR_BGRA2RGBA)
-                    if args.alpha_split:
-                        alpha_image = cv2.merge(
-                            [postprocessed_image[:, :, 3], postprocessed_image[:, :, 3], postprocessed_image[:, :, 3]])
-                        alpha_image = cv2.cvtColor(alpha_image, cv2.COLOR_RGB2RGBA)
-                        postprocessed_image = cv2.hconcat([postprocessed_image, alpha_image])
 
                     if args.output_webcam:
                         result_image = postprocessed_image
                         _, buffer = cv2.imencode('.webp', result_image, [cv2.IMWRITE_WEBP_QUALITY, 95])
                         # _, buffer = cv2.imencode('.png', result_image)
-                        data = buffer.tsobytes()  # 转换为字节流
+                        data = buffer.tobytes()  # 转换为字节流
 
                         # 先发送数据长度
                         conn.sendall(len(data).to_bytes(4, 'big'))

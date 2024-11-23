@@ -1,5 +1,5 @@
 import zlib
-
+from pyanime4k import ac
 import torch
 import pyvirtualcam
 import numpy as np
@@ -24,12 +24,8 @@ class EasyAIV(Process):  #
     @torch.no_grad()
     def run(self):
         if args.output_webcam:
-            cam_scale = 1
+            cam_scale = 2
             cam_width_scale = 1
-            if args.anime4k:
-                cam_scale = 2
-            if args.alpha_split:
-                cam_width_scale = 2
             cam = pyvirtualcam.Camera(width=args.output_w * cam_scale * cam_width_scale,
                                       height=args.output_h * cam_scale,
                                       fps=30,
@@ -67,8 +63,28 @@ class EasyAIV(Process):  #
                         # img_np = np.frombuffer(decompressed_data, dtype=np.uint8)
                         img_np = np.frombuffer(data, dtype=np.uint8)
                         result_image = cv2.imdecode(img_np, cv2.IMREAD_UNCHANGED)
-                        # result_image = np.frombuffer(data, dtype=np.uint8).reshape((512, 512, 4))
-                        cam.send(result_image)
+                        ################################
+                        parameters = ac.Parameters()
+                        # enable HDN for ACNet
+                        parameters.HDN = True
+
+                        a = ac.AC(
+                            managerList=ac.ManagerList([ac.OpenCLACNetManager(pID=0, dID=0)]),
+                            type=ac.ProcessorType.OpenCL_ACNet,
+                        )
+                        a.set_arguments(parameters)
+                        print("Anime4K Loaded")
+                        alpha_channel = result_image[:, :, 3]
+                        alpha_channel = cv2.resize(alpha_channel, None, fx=2, fy=2)
+
+                        img1 = cv2.cvtColor(result_image, cv2.COLOR_RGBA2BGR)
+                        a.load_image_from_numpy(img1, input_type=ac.AC_INPUT_BGR)
+                        a.process()
+                        result_image_cam = a.save_image_to_numpy()
+                        result_image_cam = cv2.merge((result_image_cam, alpha_channel))
+                        result_image_cam = cv2.cvtColor(result_image_cam, cv2.COLOR_BGRA2RGBA)
+                        ##################################
+                        cam.send(result_image_cam)
                         cam.sleep_until_next_frame()
                 except Exception as e:
                     print(f"Error during receiving data: {e}")
