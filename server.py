@@ -464,14 +464,24 @@ class EasyAIV(Process):  #
 
                     if args.output_webcam:
                         result_image = postprocessed_image
-                        # _, buffer = cv2.imencode('.webp', result_image, [cv2.IMWRITE_WEBP_QUALITY, 95])
-                        _, buffer = cv2.imencode('.png', result_image)
-                        compressed_data = zlib.compress(buffer.tobytes(), level=9)  # 压缩数据
+                        _, buffer = cv2.imencode('.webp', result_image, [cv2.IMWRITE_WEBP_QUALITY, 99])
+                        # _, buffer = cv2.imencode('.png', result_image)
+                        data = buffer.tsobytes()  # 转换为字节流
 
-                        # 发送压缩数据长度
-                        conn.sendall(len(compressed_data).to_bytes(4, 'big'))
-                        # 发送压缩数据
-                        conn.sendall(compressed_data)
+                        # 先发送数据长度
+                        conn.sendall(len(data).to_bytes(4, 'big'))
+                        # 发送图像数据
+                        conn.sendall(data)
+                    # if args.output_webcam:
+                    #     result_image = postprocessed_image
+                    #     _, buffer = cv2.imencode('.png', result_image)
+                    #     _, buffer = cv2.imencode('.webp', result_image, [cv2.IMWRITE_WEBP_QUALITY, 95])
+                    #     compressed_data = zlib.compress(buffer.tobytes(), level=9)  # 压缩数据
+                    #
+                    #     # 发送压缩数据长度
+                    #     conn.sendall(len(compressed_data).to_bytes(4, 'big'))
+                    #     # 发送压缩数据
+                    #     conn.sendall(compressed_data)
             except (ConnectionResetError, BrokenPipeError) as e:
                 print("客户端连接中断了，等待连接ing")
 
