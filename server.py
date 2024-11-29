@@ -8,7 +8,7 @@ import tha2.poser.modes.mode_20_wx
 from models import TalkingAnime3
 from utils import preprocessing_image
 from action_animeV2 import ActionAnimeV2
-from alive import Alive
+from alive import AliveS as Alive
 from multiprocessing import Value, Process, Queue
 import multiprocessing
 from ctypes import c_bool
@@ -306,7 +306,7 @@ class EasyAIV(Process):  #
         self.alive_args_is_music_play = alive_args['is_music_play']
         self.alive_args_beat_q = alive_args['beat_q']
         self.alive_args_mouth_q = alive_args['mouth_q']
-        ################# 远程修改
+        #################
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind(("0.0.0.0", 11453))
         self.server_socket.listen(1)
@@ -399,7 +399,6 @@ class EasyAIV(Process):  #
                         postprocessed_image,
                         rm,
                         (args.output_w, args.output_h))
-
 
                     if args.output_webcam:
                         result_image = postprocessed_image

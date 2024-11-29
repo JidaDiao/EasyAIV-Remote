@@ -1,17 +1,16 @@
-import zlib
-from pyanime4k import ac
+from alive import Voice
 import torch
+import cv2
 import pyvirtualcam
 import numpy as np
-from multiprocessing import Value, Process, Queue
+from multiprocessing import Process
+import time
 from args import args
-import cv2
+from pyanime4k import ac
 import socket
 import warnings
-import time
 
 warnings.filterwarnings("ignore", category=UserWarning)
-
 fps_delay = 0.01
 
 
@@ -19,12 +18,13 @@ class EasyAIV(Process):  #
     def __init__(self, ):
         super().__init__()
         self.client_socket = None  # 初始化为None
-        # self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     @torch.no_grad()
     def run(self):
         if args.output_webcam:
-            cam_scale = 2
+            cam_scale = 1
+            if args.anime4k:
+                cam_scale = 2
             cam_width_scale = 1
             cam = pyvirtualcam.Camera(width=args.output_w * cam_scale * cam_width_scale,
                                       height=args.output_h * cam_scale,
@@ -38,13 +38,13 @@ class EasyAIV(Process):  #
         parameters = ac.Parameters()
         # enable HDN for ACNet
         parameters.HDN = True
-
-        a = ac.AC(
-            managerList=ac.ManagerList([ac.OpenCLACNetManager(pID=0, dID=0)]),
-            type=ac.ProcessorType.OpenCL_ACNet,
-        )
-        a.set_arguments(parameters)
-        print("Anime4K Loaded")
+        if args.anime4k:
+            a = ac.AC(
+                managerList=ac.ManagerList([ac.OpenCLACNetManager(pID=0, dID=0)]),
+                type=ac.ProcessorType.OpenCL_ACNet,
+            )
+            a.set_arguments(parameters)
+            print("Anime4K Loaded")
         while True:
             try:
                 self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # 创建新的socket
@@ -54,7 +54,7 @@ class EasyAIV(Process):  #
                         # 接收数据长度（前4个字节）
                         length_buf = self.client_socket.recv(4)
                         if not length_buf:
-                            break
+                            continue
                         length = int.from_bytes(length_buf, 'big')
 
                         # 按长度接收数据
@@ -66,27 +66,31 @@ class EasyAIV(Process):  #
                             data += packet
 
                         if len(data) != length:
-                            break
+                            continue
 
                         # 转换数据为NumPy数组
                         # decompressed_data = zlib.decompress(data)  # 解压数据
                         # img_np = np.frombuffer(decompressed_data, dtype=np.uint8)
                         img_np = np.frombuffer(data, dtype=np.uint8)
                         result_image = cv2.imdecode(img_np, cv2.IMREAD_UNCHANGED)
-                        ################################
+                        if args.anime4k:
+                            ################################
 
-                        alpha_channel = result_image[:, :, 3]
-                        alpha_channel = cv2.resize(alpha_channel, None, fx=2, fy=2)
+                            alpha_channel = result_image[:, :, 3]
+                            alpha_channel = cv2.resize(alpha_channel, None, fx=2, fy=2)
 
-                        img1 = cv2.cvtColor(result_image, cv2.COLOR_RGBA2BGR)
-                        a.load_image_from_numpy(img1, input_type=ac.AC_INPUT_BGR)
-                        a.process()
-                        result_image_cam = a.save_image_to_numpy()
-                        result_image_cam = cv2.merge((result_image_cam, alpha_channel))
-                        result_image_cam = cv2.cvtColor(result_image_cam, cv2.COLOR_BGRA2RGBA)
-                        ##################################
-                        cam.send(result_image_cam)
-                        cam.sleep_until_next_frame()
+                            img1 = cv2.cvtColor(result_image, cv2.COLOR_RGBA2BGR)
+                            a.load_image_from_numpy(img1, input_type=ac.AC_INPUT_BGR)
+                            a.process()
+                            result_image_cam = a.save_image_to_numpy()
+                            result_image_cam = cv2.merge((result_image_cam, alpha_channel))
+                            result_image_cam = cv2.cvtColor(result_image_cam, cv2.COLOR_BGRA2RGBA)
+                            ##################################
+                            cam.send(result_image_cam)
+                            cam.sleep_until_next_frame()
+                        else:
+                            cam.send(result_image)
+                            cam.sleep_until_next_frame()
                 except Exception as e:
                     print(f"Error during receiving data: {e}")
                 finally:
@@ -99,3 +103,5 @@ class EasyAIV(Process):  #
 if __name__ == '__main__':
     aiv = EasyAIV()
     aiv.start()
+    alive = Voice()
+    alive.start()

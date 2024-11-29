@@ -1,3 +1,5 @@
+import socket
+
 import numpy as np
 from multiprocessing import Value, Process, Queue
 import librosa
@@ -46,6 +48,89 @@ def generate_beat_data(music_path, beat=2):
     beat_strengths = np.array([np.max(y[i:i + frame_intervals]) for i in range(0, len(y), frame_intervals)])
     beat_strengths = np.clip(beat_strengths[beat_frames[::beat]], 0., 1.).tolist()
     return beat_times, beat_strengths
+
+
+class AliveS(Process):
+    def __init__(self, alive_args):  #
+        super().__init__()
+        self.is_speech = alive_args['is_speech']
+        self.speech_q = alive_args['speech_q']
+
+        self.is_singing = alive_args['is_singing']
+        self.is_music_play = alive_args['is_music_play']
+        self.beat_q = alive_args['beat_q']
+        self.mouth_q = alive_args['mouth_q']
+        #################
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind(("0.0.0.0", 11455))
+        self.server_socket.listen(1)
+        #################
+
+    def run(self):
+        while True:
+            self.conn, address = self.server_socket.accept()
+            print(f"接受到来自 {address} 的连接")
+
+    def speak(self, speech_path):
+        try:
+            self.conn.sendall(speech_path.encode('utf-8'))
+            response = self.server_socket.recv(1024).decode('utf-8')
+            if response == "播放结束":
+                self.is_speech.value = False
+        except Exception as ex:
+            print(ex)
+            error_speech()
+
+    def sing(self, music_path, voice_path, mouth_offset, beat):
+        try:
+            beat_times, beat_strengths = generate_beat_data(music_path, beat)
+            voice_times, voice_strengths = generate_voice_data(voice_path, mouth_offset)
+
+            self.beat_q.put_nowait({'beat_times': np.array(beat_times) + time.perf_counter() - 0.15,
+                                    'beat_strengths': beat_strengths})
+            self.mouth_q.put_nowait({'voice_times': np.array(voice_times) + time.perf_counter() - 0.15,
+                                     'voice_strengths': voice_strengths})
+            self.is_singing.value = True
+
+            # 播放
+            pygame.mixer.init()
+            pygame.mixer.music.load(music_path)
+            pygame.mixer.music.play()
+            while pygame.mixer.music.get_busy() and self.is_singing.value:  # 在音频播放为完成之前不退出程序
+                time.sleep(0.1)  # 减轻循环负担
+            pygame.quit()
+            self.is_singing.value = False
+        except Exception as ex:
+            print(ex)
+            error_speech()
+
+    def rhythm(self, music_path, beat):
+        try:
+            # # 淡入淡出
+            # sr, music_data = wavfile.read(music_path)
+            # factors = np.arange(sr) / sr
+            # factors = np.concatenate([factors, np.ones(len(music_data) - 2 * sr), factors[::-1]])
+            # music_data = music_data * factors
+            # music_data = np.clip(music_data, -32767, 32767)
+            # wavfile.write(music_path, sr, music_data.astype(np.int16))
+
+            # 提取节奏点，节奏强度
+            beat_times, beat_strengths = generate_beat_data(music_path, beat)
+
+            self.beat_q.put_nowait({'beat_times': np.array(beat_times) + time.perf_counter() - 0.15,
+                                    'beat_strengths': beat_strengths})
+            self.is_music_play.value = True
+            # 播放
+            pygame.mixer.init()
+            pygame.mixer.music.load(music_path)
+            pygame.mixer.music.play()
+            while pygame.mixer.music.get_busy() and self.is_music_play.value:  # 在音频播放为完成之前不退出程序
+                time.sleep(0.1)  # 减轻循环负担
+            pygame.quit()
+            self.is_music_play.value = False
+        except Exception as ex:
+            print(ex)
+            error_speech()
 
 
 class Alive(Process):
@@ -130,6 +215,93 @@ class Alive(Process):
             print(ex)
             error_speech()
 
+
+class Voice(Process):
+    def __init__(self):  #
+        super().__init__()
+
+    def run(self):
+        while True:
+            try:
+                self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # 创建新的socket
+                self.client_socket.connect(("192.168.50.13", 11455))
+                while True:
+                    speech_path = self.client_socket.recv(1024).decode('utf-8')
+                    self.speak(speech_path)
+
+            except (ConnectionResetError, BrokenPipeError) as e:
+                print("服务器连接中断了，等待连接ing")
+
+    def speak(self, speech_path):
+        try:
+            voice_times, voice_strengths = generate_voice_data(speech_path)
+
+            self.speech_q.put_nowait({'voice_strengths': voice_strengths,
+                                      'voice_times': np.array(voice_times) + time.perf_counter() - 0.15})
+            self.is_speech.value = True
+
+            # 播放
+            pygame.mixer.init()
+            pygame.mixer.music.load(speech_path)
+            pygame.mixer.music.play()
+            while pygame.mixer.music.get_busy() and self.is_speech.value:  # 在音频播放为完成之前不退出程序
+                time.sleep(0.1)  # 减轻循环负担
+            pygame.quit()
+            self.client_socket.sendall(b"播放结束")
+        except Exception as ex:
+            print(ex)
+            error_speech()
+
+    # def sing(self, music_path, voice_path, mouth_offset, beat):
+    #     try:
+    #         beat_times, beat_strengths = generate_beat_data(music_path, beat)
+    #         voice_times, voice_strengths = generate_voice_data(voice_path, mouth_offset)
+    #
+    #         self.beat_q.put_nowait({'beat_times': np.array(beat_times) + time.perf_counter() - 0.15,
+    #                                 'beat_strengths': beat_strengths})
+    #         self.mouth_q.put_nowait({'voice_times': np.array(voice_times) + time.perf_counter() - 0.15,
+    #                                  'voice_strengths': voice_strengths})
+    #         self.is_singing.value = True
+    #
+    #         # 播放
+    #         pygame.mixer.init()
+    #         pygame.mixer.music.load(music_path)
+    #         pygame.mixer.music.play()
+    #         while pygame.mixer.music.get_busy() and self.is_singing.value:  # 在音频播放为完成之前不退出程序
+    #             time.sleep(0.1)  # 减轻循环负担
+    #         pygame.quit()
+    #         self.is_singing.value = False
+    #     except Exception as ex:
+    #         print(ex)
+    #         error_speech()
+    #
+    # def rhythm(self, music_path, beat):
+    #     try:
+    #         # # 淡入淡出
+    #         # sr, music_data = wavfile.read(music_path)
+    #         # factors = np.arange(sr) / sr
+    #         # factors = np.concatenate([factors, np.ones(len(music_data) - 2 * sr), factors[::-1]])
+    #         # music_data = music_data * factors
+    #         # music_data = np.clip(music_data, -32767, 32767)
+    #         # wavfile.write(music_path, sr, music_data.astype(np.int16))
+    #
+    #         # 提取节奏点，节奏强度
+    #         beat_times, beat_strengths = generate_beat_data(music_path, beat)
+    #
+    #         self.beat_q.put_nowait({'beat_times': np.array(beat_times) + time.perf_counter() - 0.15,
+    #                                 'beat_strengths': beat_strengths})
+    #         self.is_music_play.value = True
+    #         # 播放
+    #         pygame.mixer.init()
+    #         pygame.mixer.music.load(music_path)
+    #         pygame.mixer.music.play()
+    #         while pygame.mixer.music.get_busy() and self.is_music_play.value:  # 在音频播放为完成之前不退出程序
+    #             time.sleep(0.1)  # 减轻循环负担
+    #         pygame.quit()
+    #         self.is_music_play.value = False
+    #     except Exception as ex:
+    #         print(ex)
+    #         error_speech()
 
 # if __name__ == "__main__":
 #     error_speech()
