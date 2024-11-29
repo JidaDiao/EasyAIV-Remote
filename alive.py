@@ -66,13 +66,13 @@ class AliveS(Process):
         self.server_socket.listen(1)
         #################
 
-    def run(self):
-        while True:
-            self.conn, address = self.server_socket.accept()
-            print(f"接受到来自 {address} 的连接")
+    # def run(self):
+    #     while True:
+    #         print(f"接受到来自 {address} 的连接")
 
     def speak(self, speech_path):
         try:
+            self.conn, address = self.server_socket.accept()
             self.conn.sendall(speech_path.encode('utf-8'))
             response = self.server_socket.recv(1024).decode('utf-8')
             if response == "播放结束":
