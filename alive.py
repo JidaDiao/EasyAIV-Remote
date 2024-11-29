@@ -247,7 +247,7 @@ class Voice(Process):
             while pygame.mixer.music.get_busy() and self.is_speech.value:  # 在音频播放为完成之前不退出程序
                 time.sleep(0.1)  # 减轻循环负担
             pygame.quit()
-            self.client_socket.sendall(b"播放结束")
+            self.client_socket.sendall("播放结束".encode('utf-8'))
         except Exception as ex:
             print(ex)
             error_speech()
