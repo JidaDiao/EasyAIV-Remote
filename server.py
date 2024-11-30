@@ -8,7 +8,7 @@ import tha2.poser.modes.mode_20_wx
 from models import TalkingAnime3
 from utils import preprocessing_image
 from action_animeV2 import ActionAnimeV2
-from alive import AliveS as Alive
+from alive import AliveS
 from multiprocessing import Value, Process, Queue
 import multiprocessing
 from ctypes import c_bool
@@ -505,7 +505,7 @@ if __name__ == '__main__':
         "mouth_q": Queue(),
     }
     # 初始化模块
-    alive = Alive(alive_args)
+    alive = AliveS(alive_args)
     alive.start()
 
     # 初始化主进程

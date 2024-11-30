@@ -5,6 +5,7 @@ from multiprocessing import Value, Process, Queue
 import librosa
 import time
 import pygame
+import pickle
 
 
 def error_speech():
@@ -65,21 +66,46 @@ class AliveS(Process):
         self.server_socket.bind(("0.0.0.0", 11455))
         self.server_socket.listen(1)
         #################
+        self.connection = None
+        self.address = None
 
-    # def run(self):
-    #     while True:
-    #         print(f"接受到来自 {address} 的连接")
+    def run(self):
+        print("服务器正在运行，等待连接...")
+
+        while True:
+            try:
+                # 接受一个客户端连接，并保持连接
+                if self.connection is None:
+                    self.connection, self.address = self.server_socket.accept()
+                    print(f"接受到来自 {self.address} 的连接")
+                else:
+                    time.sleep(0.1)  # 保持连接，无需额外处理
+            except Exception as ex:
+                print(f"发生错误: {ex}")
+                self.connection = None  # 出现异常时清除当前连接
 
     def speak(self, speech_path):
         try:
-            self.conn, address = self.server_socket.accept()
-            self.conn.sendall(speech_path.encode('utf-8'))
-            response = self.server_socket.recv(1024).decode('utf-8')
+            print(f"发送语音路径: {speech_path}")
+            self.connection.sendall(speech_path.encode('utf-8'))
+            response = self.connection.recv(1024)
+            received_data = pickle.loads(response)
+            voice_times, voice_strengths = received_data  # 解包成两个列表
+            self.speech_q.put_nowait({'voice_strengths': voice_strengths,
+                                      'voice_times': voice_times})
+            self.is_speech.value = True
+
+            # 等待客户端响应 (例如 "播放结束")
+            response = self.connection.recv(1024).decode('utf-8')
+            print(f"收到客户端响应: {response}")
+
             if response == "播放结束":
                 self.is_speech.value = False
+                print("语音播放已结束。")
+
         except Exception as ex:
-            print(ex)
-            error_speech()
+            print(f"发送语音路径时发生错误: {ex}")
+            self.connection = None  # 关闭并清理连接
 
     def sing(self, music_path, voice_path, mouth_offset, beat):
         try:
@@ -229,22 +255,24 @@ class Voice(Process):
                     speech_path = self.client_socket.recv(1024).decode('utf-8')
                     self.speak(speech_path)
 
-            except (ConnectionResetError, BrokenPipeError) as e:
-                print("服务器连接中断了，等待连接ing")
+
+            except (ConnectionResetError, BrokenPipeError, socket.error, pygame.error) as e:
+                print(f"错误：{e}")
+                print("服务器连接中断了，等待重新连接...")
+                time.sleep(2)  # 等待 2 秒再重新连接
 
     def speak(self, speech_path):
         try:
             voice_times, voice_strengths = generate_voice_data(speech_path)
-
-            self.speech_q.put_nowait({'voice_strengths': voice_strengths,
-                                      'voice_times': np.array(voice_times) + time.perf_counter() - 0.15})
-            self.is_speech.value = True
+            data_to_send = (np.array(voice_times) + time.perf_counter() - 0.15, voice_strengths)
+            serialized_data = pickle.dumps(data_to_send)
+            self.client_socket.send(serialized_data)
 
             # 播放
             pygame.mixer.init()
             pygame.mixer.music.load(speech_path)
             pygame.mixer.music.play()
-            while pygame.mixer.music.get_busy() and self.is_speech.value:  # 在音频播放为完成之前不退出程序
+            while pygame.mixer.music.get_busy():  # 在音频播放为完成之前不退出程序
                 time.sleep(0.1)  # 减轻循环负担
             pygame.quit()
             self.client_socket.sendall("播放结束".encode('utf-8'))
