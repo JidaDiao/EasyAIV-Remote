@@ -86,25 +86,23 @@ class AliveS(Process):
     def speak(self, speech_path):
         try:
             while True:
-                if self.connection is not None:
-                    print(f"发送语音路径: {speech_path}")
-                    self.connection.sendall(speech_path.encode('utf-8'))
-                    response = self.connection.recv(1024)
-                    received_data = pickle.loads(response)
-                    voice_times, voice_strengths = received_data  # 解包成两个列表
-                    self.speech_q.put_nowait({'voice_strengths': voice_strengths,
-                                              'voice_times': voice_times})
-                    self.is_speech.value = True
+                print(f"发送语音路径: {speech_path}")
+                self.connection.sendall(speech_path.encode('utf-8'))
+                response = self.connection.recv(1024)
+                received_data = pickle.loads(response)
+                voice_times, voice_strengths = received_data  # 解包成两个列表
+                self.speech_q.put_nowait({'voice_strengths': voice_strengths,
+                                          'voice_times': voice_times})
+                self.is_speech.value = True
 
-                    # 等待客户端响应 (例如 "播放结束")
-                    response = self.connection.recv(1024).decode('utf-8')
-                    print(f"收到客户端响应: {response}")
+                # 等待客户端响应 (例如 "播放结束")
+                response = self.connection.recv(1024).decode('utf-8')
+                print(f"收到客户端响应: {response}")
 
-                    if response == "播放结束":
-                        self.is_speech.value = False
-                        print("语音播放已结束。")
-                else:
-                    print("??????")
+                if response == "播放结束":
+                    self.is_speech.value = False
+                    print("语音播放已结束。")
+                    break
 
         except Exception as ex:
             print(f"发送语音路径时发生错误: {ex}")
