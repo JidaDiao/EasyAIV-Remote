@@ -66,23 +66,22 @@ class AliveS(Process):
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind(("0.0.0.0", 11455))
         self.server_socket.listen(1)
-        #################
-        self.connection = None
-        self.address = None
+        self.connection, self.address = self.server_socket.accept()
+        print(f"AliveS接受到来自 {self.address} 的连接")
 
-    def run(self):
-        print("服务器正在运行，等待连接...")
-
-        while True:
-            try:
-                self.connection, self.address = self.server_socket.accept()
-                print(f"AliveS接受到来自 {self.address} 的连接")
-                while True:
-                    if self.connection is None:
-                        break
-            except Exception as ex:
-                print(f"发生错误: {ex}")
-                self.connection = None  # 出现异常时清除当前连接
+    # def run(self):
+    #     print("服务器正在运行，等待连接...")
+    #
+    #     while True:
+    #         try:
+    #             self.connection, self.address = self.server_socket.accept()
+    #             print(f"AliveS接受到来自 {self.address} 的连接")
+    #             while True:
+    #                 if self.connection is None:
+    #                     break
+    #         except Exception as ex:
+    #             print(f"发生错误: {ex}")
+    #             self.connection = None  # 出现异常时清除当前连接
 
     def speak(self, speech_path):
         try:
