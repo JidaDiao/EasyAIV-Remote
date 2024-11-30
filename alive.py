@@ -1,3 +1,4 @@
+import os.path
 import socket
 
 import numpy as np
@@ -74,12 +75,11 @@ class AliveS(Process):
 
         while True:
             try:
-                # 接受一个客户端连接，并保持连接
-                if self.connection is None:
-                    self.connection, self.address = self.server_socket.accept()
-                    print(f"AliveS接受到来自 {self.address} 的连接")
-                else:
-                    time.sleep(0.1)  # 保持连接，无需额外处理
+                self.connection, self.address = self.server_socket.accept()
+                print(f"AliveS接受到来自 {self.address} 的连接")
+                while True:
+                    if self.connection is None:
+                        break
             except Exception as ex:
                 print(f"发生错误: {ex}")
                 self.connection = None  # 出现异常时清除当前连接
@@ -257,7 +257,8 @@ class Voice(Process):
                 self.client_socket.connect(("192.168.50.13", 11455))
                 while True:
                     speech_path = self.client_socket.recv(1024).decode('utf-8')
-                    self.speak(speech_path)
+                    if os.path.exists(speech_path):
+                        self.speak(speech_path)
 
 
             except (ConnectionResetError, BrokenPipeError, socket.error, pygame.error) as e:
