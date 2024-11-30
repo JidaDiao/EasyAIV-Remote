@@ -77,7 +77,7 @@ class AliveS(Process):
                 # 接受一个客户端连接，并保持连接
                 if self.connection is None:
                     self.connection, self.address = self.server_socket.accept()
-                    print(f"接受到来自 {self.address} 的连接")
+                    print(f"AliveS接受到来自 {self.address} 的连接")
                 else:
                     time.sleep(0.1)  # 保持连接，无需额外处理
             except Exception as ex:
@@ -86,22 +86,26 @@ class AliveS(Process):
 
     def speak(self, speech_path):
         try:
-            print(f"发送语音路径: {speech_path}")
-            self.connection.sendall(speech_path.encode('utf-8'))
-            response = self.connection.recv(1024)
-            received_data = pickle.loads(response)
-            voice_times, voice_strengths = received_data  # 解包成两个列表
-            self.speech_q.put_nowait({'voice_strengths': voice_strengths,
-                                      'voice_times': voice_times})
-            self.is_speech.value = True
+            while True:
+                if self.connection is not None:
+                    print(f"发送语音路径: {speech_path}")
+                    self.connection.sendall(speech_path.encode('utf-8'))
+                    response = self.connection.recv(1024)
+                    received_data = pickle.loads(response)
+                    voice_times, voice_strengths = received_data  # 解包成两个列表
+                    self.speech_q.put_nowait({'voice_strengths': voice_strengths,
+                                              'voice_times': voice_times})
+                    self.is_speech.value = True
 
-            # 等待客户端响应 (例如 "播放结束")
-            response = self.connection.recv(1024).decode('utf-8')
-            print(f"收到客户端响应: {response}")
+                    # 等待客户端响应 (例如 "播放结束")
+                    response = self.connection.recv(1024).decode('utf-8')
+                    print(f"收到客户端响应: {response}")
 
-            if response == "播放结束":
-                self.is_speech.value = False
-                print("语音播放已结束。")
+                    if response == "播放结束":
+                        self.is_speech.value = False
+                        print("语音播放已结束。")
+                else:
+                    print("??????")
 
         except Exception as ex:
             print(f"发送语音路径时发生错误: {ex}")
